@@ -7,6 +7,7 @@ import System.IO
 import System.Random
 
 import OpenFallingBlock.Game
+import OpenFallingBlock.Pieces
 
 main :: MonadIO m => m ()
 main = do
@@ -36,5 +37,5 @@ mainLoop = do
 
 nextPiece :: MonadIO m => m LivePiece
 nextPiece = do
-  b <- liftIO randomIO
-  pure (if b then line else square)
+  i <- liftIO (randomRIO (0, length pieces - 1))
+  pure (pieces !! i)

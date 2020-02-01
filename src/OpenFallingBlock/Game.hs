@@ -2,11 +2,11 @@ module OpenFallingBlock.Game where
 
 import Control.Applicative
 import Control.Lens hiding (indices, Empty)
-import Data.Array
 import Data.Tuple
+import Data.Array
 
-data Block = Empty | Full
-  deriving (Eq, Show)
+import OpenFallingBlock.Pieces
+
 type Board = Array (Int, Int) Block
 
 width, height :: Int
@@ -18,33 +18,6 @@ boardBounds = ((0,0), (width-1,height-1))
 
 emptyBoard :: Board
 emptyBoard = listArray boardBounds (repeat Empty)
-
-type Piece = Array (Int, Int) Block
-
-lineHoriz, lineVert :: Piece
-lineHoriz = listArray ((-2,0), (1,0)) [Full,  Full,  Full,  Full]
-lineVert = listArray ((0,-1), (0,2)) [Full,  Full,  Full,  Full]
-line :: LivePiece
-line = LivePiece [lineHoriz, lineVert] 0 5 19
-
-square' :: Piece
-square' = listArray ((-1,-1), (0,0)) [ Full,  Full
-                                    , Full,  Full]
-square :: LivePiece
-square = LivePiece [square'] 0 5 19
-
-
-data LivePiece = LivePiece
-  { _rotations :: [Piece]
-  , _rot :: Int
-  , _x :: Int
-  , _y :: Int
-  }
-  deriving Show
-makeLenses ''LivePiece
-
-piece :: LivePiece -> Piece
-piece (LivePiece rotations rot _ _) = rotations !! mod rot (length rotations)
 
 data Game = Game
   { _board :: Board
