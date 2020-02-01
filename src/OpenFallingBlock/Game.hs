@@ -6,15 +6,18 @@ import Data.Array
 import Data.Tuple
 
 data Block = Empty | Full
-  deriving Show
+  deriving (Eq, Show)
 type Board = Array (Int, Int) Block
 
 width, height :: Int
 width = 10
 height = 20
 
+boardBounds :: ((Int, Int), (Int, Int))
+boardBounds = ((0,0), (width-1,height-1))
+
 emptyBoard :: Board
-emptyBoard = listArray ((0,0), (width-1,height-1)) (repeat Empty)
+emptyBoard = listArray boardBounds (repeat Empty)
 
 type Piece = Array (Int, Int) Block
 
@@ -46,21 +49,32 @@ data Game = Game
 makeLenses ''Game
 
 printBoard :: Board -> String
-printBoard b = unlines $ do y <- [height-1,height-2..0]
-                            pure $ do x <- [0..width-1]
-                                      pure $ case b ! (x, y) of
-                                        Empty -> ' '
-                                        Full -> '#'
+printBoard b = unlines $ do
+  y <- [height-1,height-2..0]
+  pure $ do
+    x <- [0..width-1]
+    pure $ case b ! (x, y) of
+      Empty -> ' '
+      Full -> '#'
 
-exampleGame :: Game
-exampleGame = Game emptyBoard (Just squareStart)
+lockIn :: LivePiece -> Board -> Board
+lockIn p b = array (bounds b) $ do
+  bi <- indices b
+  let pi = (bimap (subtract (p^.x)) (subtract (p^.y)) bi)
+  pure $ if (inRange (bounds (p^.piece)) pi)
+    then (bi, (p^.piece) ! pi)
+    else (bi, b ! bi)
 
-lockIn :: Game -> Game
-lockIn (Game b Nothing) = Game b Nothing
-lockIn (Game b (Just p)) = Game b' Nothing where
-  b' = array (bounds b) $ do
-    bi <- indices b
-    let pi = (bimap (subtract (p^.x)) (subtract (p^.y)) bi)
-    pure $ if (inRange (bounds (p^.piece)) pi)
-      then (bi, (p^.piece) ! pi)
-      else (bi, b ! bi)
+overlaps :: LivePiece -> Board -> Bool
+overlaps p b = or $ do
+  bi <- indices b
+  case b ! bi of
+    Empty -> pure False
+    Full -> do
+      let pi = (bimap (subtract (p^.x)) (subtract (p^.y)) bi)
+      pure $ if (inRange (bounds (p^.piece)) pi)
+        then (p^.piece) ! pi == Full
+        else False
+
+inBounds :: LivePiece -> Bool
+inBounds p = all (inRange boardBounds . bimap (+p^.x) (+p^.y)) (indices (p^.piece))
