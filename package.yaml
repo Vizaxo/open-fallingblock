@@ -11,14 +11,17 @@ dependencies:
 - base >= 4.7 && < 5
 - array
 - lens
+- mtl
+- random
+
+default-extensions:
+- TemplateHaskell
+- FlexibleContexts
 
 library:
   source-dirs: src
   ghc-options:
   - -O2
-
-default-extensions:
-- TemplateHaskell
 
 executables:
   open-fallingblock-exe:
