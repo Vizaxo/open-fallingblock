@@ -21,25 +21,30 @@ emptyBoard = listArray boardBounds (repeat Empty)
 
 type Piece = Array (Int, Int) Block
 
-line :: Piece
-line = listArray ((-2,0), (1,0)) [Full,  Full,  Full,  Full]
-lineStart :: LivePiece
-lineStart = LivePiece line 5 19
+lineHoriz, lineVert :: Piece
+lineHoriz = listArray ((-2,0), (1,0)) [Full,  Full,  Full,  Full]
+lineVert = listArray ((0,-1), (0,2)) [Full,  Full,  Full,  Full]
+line :: LivePiece
+line = LivePiece [lineHoriz, lineVert] 0 5 19
 
-square :: Piece
-square = listArray ((-1,-1), (0,0)) [ Full,  Full
+square' :: Piece
+square' = listArray ((-1,-1), (0,0)) [ Full,  Full
                                     , Full,  Full]
-squareStart :: LivePiece
-squareStart = LivePiece square 5 19
+square :: LivePiece
+square = LivePiece [square'] 0 5 19
 
 
 data LivePiece = LivePiece
-  { _piece :: Piece
+  { _rotations :: [Piece]
+  , _rot :: Int
   , _x :: Int
   , _y :: Int
   }
   deriving Show
 makeLenses ''LivePiece
+
+piece :: LivePiece -> Piece
+piece (LivePiece rotations rot _ _) = rotations !! mod rot (length rotations)
 
 data Game = Game
   { _board :: Board
@@ -61,8 +66,8 @@ lockIn :: LivePiece -> Board -> Board
 lockIn p b = array (bounds b) $ do
   bi <- indices b
   let pi = (bimap (subtract (p^.x)) (subtract (p^.y)) bi)
-  pure $ if (inRange (bounds (p^.piece)) pi)
-    then (bi, (p^.piece) ! pi)
+  pure $ if (inRange (bounds (piece p)) pi)
+    then (bi, piece p ! pi)
     else (bi, b ! bi)
 
 overlaps :: LivePiece -> Board -> Bool
@@ -72,9 +77,17 @@ overlaps p b = or $ do
     Empty -> pure False
     Full -> do
       let pi = (bimap (subtract (p^.x)) (subtract (p^.y)) bi)
-      pure $ if (inRange (bounds (p^.piece)) pi)
-        then (p^.piece) ! pi == Full
+      pure $ if (inRange (bounds (piece p)) pi)
+        then piece p ! pi == Full
         else False
 
 inBounds :: LivePiece -> Bool
-inBounds p = all (inRange boardBounds . bimap (+p^.x) (+p^.y)) (indices (p^.piece))
+inBounds p = all (inRange boardBounds . bimap (+p^.x) (+p^.y)) (indices (piece p))
+
+rotateR, rotateL, up, down, left, right :: LivePiece -> LivePiece
+rotateR = over rot (+1)
+rotateL = over rot (subtract 1)
+up = over y (+1)
+down = over y (subtract 1)
+left = over x (subtract 1)
+right = over x (+1)
