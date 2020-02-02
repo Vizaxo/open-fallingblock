@@ -40,7 +40,9 @@ lockIn p b = array (bounds b) $ do
   bi <- indices b
   let pi = (bimap (subtract (p^.x)) (subtract (p^.y)) bi)
   pure $ if (inRange (bounds (piece p)) pi)
-    then (bi, piece p ! pi)
+    then case piece p ! pi of
+           Full -> (bi, Full)
+           Empty -> (bi, b ! bi)
     else (bi, b ! bi)
 
 overlaps :: LivePiece -> Board -> Bool
