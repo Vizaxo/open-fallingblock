@@ -19,13 +19,6 @@ boardBounds = ((0,0), (width-1,height-1))
 emptyBoard :: Board
 emptyBoard = listArray boardBounds (repeat Empty)
 
-data Game = Game
-  { _board :: Board
-  , _active :: Maybe LivePiece
-  }
-  deriving Show
-makeLenses ''Game
-
 printBoard :: Board -> String
 printBoard b = unlines $ do
   y <- [height-1,height-2..0]
