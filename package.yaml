@@ -1,6 +1,6 @@
 name:                open-fallingblock
 version:             0.1.0.0
-license:             GPL-1
+license:             AGPL-3
 license-file:        LICENSE
 
 extra-source-files:
