@@ -1,6 +1,7 @@
 module OpenFallingBlock.TUI where
 
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Lens
 import Control.Monad.State
 import System.Console.ANSI
@@ -18,13 +19,55 @@ data Game = Game
   deriving Show
 makeLenses ''Game
 
+data Input = U | D | L | R | A | B
+
 main :: MonadIO m => m ()
 main = do
+  chan <- liftIO newTChanIO
   initialise
+  liftIO $ forkIO (inputThread chan)
   liftIO $ replicateM 21 (putStrLn "")
   void $ flip runStateT (Game emptyBoard Nothing 0) $ forever $ do
+    liftIO (atomically (tryReadTChan chan)) >>= \case
+      Nothing -> pure ()
+      Just i -> runInput i
     runFrame
-    liftIO (threadDelay (1000000 `div` 60) )
+    liftIO (threadDelay (1000000 `div` 20) )
+
+tryAction :: (MonadState Game m) => (LivePiece -> LivePiece) -> m ()
+tryAction f = do
+  b <- gets (^. board)
+  gets (^. active) >>= \case
+    Nothing -> pure ()
+    Just a ->
+      let a' = f a
+      in if not (overlaps a' b) && inBounds a'
+      then modify (set active (Just a'))
+      else pure ()
+
+runInput :: (MonadIO m, MonadState Game m) => Input -> m ()
+runInput i = tryAction (action i) where
+  action U = up
+  action D = down
+  action L = left
+  action R = right
+  action A = rotateR
+  action B = rotateL
+
+charToInput :: Char -> Maybe Input
+charToInput 'a' = Just L
+charToInput 'e' = Just R
+charToInput ',' = Just U
+charToInput 'o' = Just D
+charToInput 'h' = Just B
+charToInput 't' = Just A
+charToInput _ = Nothing
+
+inputThread :: TChan Input -> IO ()
+inputThread chan = forever $ do
+  charToInput <$> getChar >>= \case
+    Nothing -> pure ()
+    Just i -> atomically (writeTChan chan i)
 
 initialise :: MonadIO m => m ()
 initialise = do

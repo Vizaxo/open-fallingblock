@@ -14,10 +14,12 @@ dependencies:
 - mtl
 - random
 - ansi-terminal
+- stm
 
 default-extensions:
 - TemplateHaskell
 - FlexibleContexts
+- LambdaCase
 
 library:
   source-dirs: src
