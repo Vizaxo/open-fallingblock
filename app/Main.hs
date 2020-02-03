@@ -1,5 +1,6 @@
 module Main where
 
+import OpenFallingBlock.TUI
+
 main :: IO ()
-main = do
-  putStrLn "hello world"
+main = runTUI
