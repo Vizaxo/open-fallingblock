@@ -15,6 +15,10 @@ dependencies:
 - random
 - ansi-terminal
 - stm
+- linear
+- GLFW-b
+- OpenGL
+- GLUtil
 
 default-extensions:
 - TemplateHaskell
