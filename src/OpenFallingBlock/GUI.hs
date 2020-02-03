@@ -26,6 +26,9 @@ main = do
     GLFW.defaultWindowHints
     GLFW.windowHint (GLFW.WindowHint'Resizable False)
     GLFW.windowHint (GLFW.WindowHint'Focused True)
+    GLFW.windowHint (GLFW.WindowHint'ContextVersionMajor 3)
+    GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 3)
+    GLFW.windowHint (GLFW.WindowHint'OpenGLProfile OpenGLProfile'Core)
     Just win <- GLFW.createWindow width height "open-fallingblock" Nothing Nothing
     GLFW.makeContextCurrent (Just win)
     GLFW.swapInterval 1
