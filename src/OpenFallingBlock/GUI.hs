@@ -1,7 +1,7 @@
 module OpenFallingBlock.GUI where
 
 import Graphics.UI.GLFW as GLFW
-import Graphics.Rendering.OpenGL
+import Graphics.Rendering.OpenGL hiding (R)
 import Graphics.GLUtil
 import Graphics.GLUtil.Camera3D
 import Control.Monad
@@ -12,14 +12,23 @@ import Foreign.Storable
 import Linear.Matrix
 import Data.Word
 import System.Random
+import Control.Concurrent
+import Control.Concurrent.STM
+import Control.Monad.State
+import Control.Lens
+import Data.Array
+
+import OpenFallingBlock.Game
+import OpenFallingBlock.Pieces as Piece
+import OpenFallingBlock.Input
 
 data Blocks = Blocks VertexArrayObject NumArrayIndices BufferObject ShaderProgram
 
 makeSquares :: ([Word32], [Vector2 Float])
-makeSquares = (replicate 200 0, [Vector2 ((32*x)+16.0) ((32*y)+16.0) | x <- [0..9], y <- [0..19]])
+makeSquares = (replicate 200 3, [Vector2 ((32*x)+16.0) ((32*y)+16.0) | x <- [0..9], y <- [0..19]])
 
-main :: IO ()
-main = do
+runGUI :: IO ()
+runGUI = do
   let width  = 320
       height = 640
   b <- GLFW.init
@@ -33,16 +42,31 @@ main = do
   Just win <- GLFW.createWindow width height "open-fallingblock" Nothing Nothing
   GLFW.makeContextCurrent (Just win)
   GLFW.swapInterval 1
-  GLFW.setKeyCallback win (Just keyPressed)
   GLFW.setWindowCloseCallback win (Just shutdown)
+  chan <- newTChanIO
+  GLFW.setKeyCallback win (Just $ keyPressed chan)
   clearColor $= Color4 0.1 0.1 0.1 1.0
   let ortho = orthoMatrix 0.0 (fromIntegral width) (fromIntegral height) 0.0 (-1.0) 1.0
-  let (types, coords) = makeSquares
+      (types, coords) = makeSquares
+  gameTickRate <- getTimerFrequency >>= return . (`div` 2)
   initBlocks types coords >>= \case
     Left err -> putStrLn err
     Right blocks@(Blocks _ _ _ sp) -> do
       setUniform sp "uProj" (ortho :: M44 Float)
-      withWindow win $ draw blocks
+      void $ flip runStateT (Game emptyBoard Nothing 0 0) $ forever $ do
+        liftIO (atomically (tryReadTChan chan)) >>= \case
+          Nothing -> pure ()
+          Just i  -> runInput i
+        runFrame blocks
+        ticksPrev <- gets (^. platformTicks)
+        ticksNow <- liftIO getTimerValue
+        case (ticksNow - ticksPrev > gameTickRate) of
+          True  -> do gameTick
+                      modify (set platformTicks ticksNow)
+          False -> return ()
+        liftIO $ do
+          GLFW.swapBuffers win
+          GLFW.pollEvents
 
 initBlocks :: [Word32] -> [Vector2 Float] -> IO (Either String Blocks)
 initBlocks types verts = do
@@ -73,23 +97,24 @@ initBlocks types verts = do
       setUniform sp "uTex" (TextureUnit 0)
       return $ Right $ Blocks vao (fromIntegral $ length verts) typeBuf sp
 
-draw :: Blocks -> IO ()
-draw (Blocks vao n typesBuf sp) = do
-  bindVertexArrayObject $= Just vao
-  drawArrays Points 0 n
-  bindBuffer ArrayBuffer $= Just typesBuf
-  withMappedBuffer ArrayBuffer WriteOnly
-    (\ptr -> do
-        rs <- replicateM 200 $ randomRIO (0, 3)
-        sequence_ [pokeElemOff (ptr :: Ptr Word32) i r | (i,r) <- zip [0..199] rs])
-    (\failure -> putStrLn $ "withMappedBuffer failure: " ++ show failure)
-
-withWindow :: Window -> IO () -> IO ()
-withWindow win io = forever $ do
-  clear [ColorBuffer]
-  io
-  GLFW.swapBuffers win
-  GLFW.waitEventsTimeout 0.2
+runFrame :: (MonadIO m, MonadState Game m) => Blocks -> m ()
+runFrame (Blocks vao n typesBuf sp) = do
+  b <- gets (^. board)
+  a <- gets (^. active)
+  liftIO $ do
+    let toBlock Piece.Empty = 3
+        toBlock Piece.Full  = 0
+        bb = case a of
+          Nothing -> b
+          Just p  -> lockIn p b
+        blockList = [(y+x*20, toBlock block) | ((x,y),block) <- assocs bb]
+    clear [ColorBuffer]
+    bindBuffer ArrayBuffer $= Just typesBuf
+    withMappedBuffer ArrayBuffer WriteOnly
+      (\ptr -> sequence_ [pokeElemOff (ptr :: Ptr Word32) i block | (i,block) <- blockList])
+      (\failure -> putStrLn $ "withMappedBuffer failure: " ++ show failure)
+    bindVertexArrayObject $= Just vao
+    drawArrays Points 0 n
 
 shutdown :: Window -> IO ()
 shutdown win = do
@@ -97,6 +122,12 @@ shutdown win = do
   GLFW.terminate
   exitSuccess
 
-keyPressed :: Window -> Key -> a -> KeyState -> b -> IO ()
-keyPressed win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown win
-keyPressed _   _               _ _                     _ = return ()
+keyPressed :: TChan Input -> Window -> Key -> Int -> KeyState -> ModifierKeys -> IO ()
+keyPressed chan win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown win
+keyPressed chan win GLFW.Key'A      _ GLFW.KeyState'Pressed _ = atomically (writeTChan chan L)
+keyPressed chan win GLFW.Key'E      _ GLFW.KeyState'Pressed _ = atomically (writeTChan chan R)
+keyPressed chan win GLFW.Key'Comma  _ GLFW.KeyState'Pressed _ = atomically (writeTChan chan U)
+keyPressed chan win GLFW.Key'O      _ GLFW.KeyState'Pressed _ = atomically (writeTChan chan D)
+keyPressed chan win GLFW.Key'H      _ GLFW.KeyState'Pressed _ = atomically (writeTChan chan B)
+keyPressed chan win GLFW.Key'T      _ GLFW.KeyState'Pressed _ = atomically (writeTChan chan A)
+keyPressed chan _   _               _ _                     _ = return ()

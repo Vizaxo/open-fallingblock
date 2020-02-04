@@ -5,6 +5,7 @@ import Control.Lens hiding (indices, Empty)
 import Control.Monad.State
 import Data.Tuple
 import Data.Array
+import Data.Word
 import System.Random
 
 import OpenFallingBlock.Pieces
@@ -15,7 +16,7 @@ data Game = Game
   { _board :: Board
   , _active :: Maybe LivePiece
   , _frame :: Int
-  }
+  , _platformTicks :: Word64}
   deriving Show
 makeLenses ''Game
 

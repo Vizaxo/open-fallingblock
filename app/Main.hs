@@ -1,6 +1,7 @@
 module Main where
 
 import OpenFallingBlock.TUI
+import OpenFallingBlock.GUI
 
 main :: IO ()
-main = runTUI
+main = runGUI

@@ -18,7 +18,7 @@ runTUI = do
   initialise
   liftIO $ forkIO (inputThread chan)
   liftIO $ replicateM 21 (putStrLn "")
-  void $ flip runStateT (Game emptyBoard Nothing 0) $ forever $ do
+  void $ flip runStateT (Game emptyBoard Nothing 0 0) $ forever $ do
     liftIO (atomically (tryReadTChan chan)) >>= \case
       Nothing -> pure ()
       Just i -> runInput i
