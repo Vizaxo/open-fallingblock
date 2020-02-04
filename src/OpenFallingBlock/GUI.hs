@@ -43,6 +43,10 @@ runGUI = do
   GLFW.makeContextCurrent (Just win)
   GLFW.swapInterval 1
   GLFW.setWindowCloseCallback win (Just shutdown)
+  GLFW.joystickPresent GLFW.Joystick'1 >>= \case
+    True  -> GLFW.getJoystickName GLFW.Joystick'1 >>= \case
+      Just name -> putStrLn $ "Got joystick: " ++ name
+    False -> return ()
   chan <- newTChanIO
   GLFW.setKeyCallback win (Just $ keyPressed chan)
   clearColor $= Color4 0.1 0.1 0.1 1.0
@@ -57,6 +61,7 @@ runGUI = do
         liftIO (atomically (tryReadTChan chan)) >>= \case
           Nothing -> pure ()
           Just i  -> runInput i
+        liftIO $ handleJoyInput chan
         runFrame blocks
         ticksPrev <- gets (^. platformTicks)
         ticksNow <- liftIO getTimerValue
@@ -67,6 +72,19 @@ runGUI = do
         liftIO $ do
           GLFW.swapBuffers win
           GLFW.pollEvents
+
+printJoyInput :: Maybe [JoystickButtonState] -> IO ()
+printJoyInput (Just btns) = print $ map (\case JoystickButtonState'Pressed  -> True 
+                                               JoystickButtonState'Released -> False) btns
+printJoyInput Nothing     = return ()            
+
+-- X360 controller: [A,B,X,Y,LB,RB,SEL,START,L3,R3,UP,RIGHT,DOWN,LEFT]
+joyMappings :: [(Int,Input)]
+joyMappings = [(0,A),(1,B),(10,U),(11,R),(12,D),(13,L)]
+
+handleJoyInput :: TChan Input -> IO ()
+handleJoyInput chan = getJoystickButtons GLFW.Joystick'1 >>= \case
+  Just btns -> sequence_ [atomically (writeTChan chan i) | (a,i) <- joyMappings, (btns !! a) == JoystickButtonState'Pressed]
 
 initBlocks :: [Word32] -> [Vector2 Float] -> IO (Either String Blocks)
 initBlocks types verts = do
